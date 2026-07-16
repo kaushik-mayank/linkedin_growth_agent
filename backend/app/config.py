@@ -18,6 +18,10 @@ EMBEDDING_DIMENSIONS = int(os.getenv("EMBEDDING_DIMENSIONS", "768"))
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
+# 168 hours = 7 days, matching the weekly upload cadence
+TAVILY_CACHE_TTL_HOURS = int(os.getenv("TAVILY_CACHE_TTL_HOURS", "168"))
+
 ALLOWED_ORIGINS = [
     origin.strip()
     for origin in os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
