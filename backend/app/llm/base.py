@@ -14,5 +14,5 @@ class LLMProvider(ABC):
     name: str
 
     @abstractmethod
-    async def generate(self, prompt: str) -> str:
+    async def generate(self, prompt: str, system: str | None = None) -> str:
         ...

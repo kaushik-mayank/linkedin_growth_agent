@@ -9,7 +9,7 @@ GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions"
 class GroqProvider(LLMProvider):
     name = "groq"
 
-    async def generate(self, prompt: str) -> str:
+    async def generate(self, prompt: str, system: str | None = None) -> str:
         if not config.GROQ_API_KEY:
             raise LLMError(self.name, "GROQ_API_KEY is empty — add it to backend/.env")
 
@@ -19,9 +19,13 @@ class GroqProvider(LLMProvider):
             # Required: Groq's Cloudflare front door 403s default Python user-agents.
             "User-Agent": config.HTTP_USER_AGENT,
         }
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
         payload = {
             "model": config.GROQ_MODEL,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": messages,
         }
 
         try:

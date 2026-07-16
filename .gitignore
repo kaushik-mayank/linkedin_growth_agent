@@ -6,6 +6,9 @@
 # Local caches (e.g. Tavily research cache)
 .cache/
 
+# Generated weekly plan markdown files
+generated_plans/
+
 # Python
 __pycache__/
 *.pyc

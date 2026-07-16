@@ -7,7 +7,7 @@ from app.llm.base import LLMError, LLMProvider
 class GeminiProvider(LLMProvider):
     name = "gemini"
 
-    async def generate(self, prompt: str) -> str:
+    async def generate(self, prompt: str, system: str | None = None) -> str:
         if not config.GEMINI_API_KEY:
             raise LLMError(self.name, "GEMINI_API_KEY is empty — add it to backend/.env")
 
@@ -19,7 +19,9 @@ class GeminiProvider(LLMProvider):
             "Content-Type": "application/json",
             "User-Agent": config.HTTP_USER_AGENT,
         }
-        payload = {"contents": [{"parts": [{"text": prompt}]}]}
+        payload: dict = {"contents": [{"parts": [{"text": prompt}]}]}
+        if system:
+            payload["systemInstruction"] = {"parts": [{"text": system}]}
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
