@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from app import config
 from app.llm.base import LLMError
 from app.llm.factory import get_default_provider, get_other_provider_name, get_provider
+from app.routers import projects
 
 app = FastAPI(title="LinkedIn Growth Agent — Backend")
 
@@ -15,6 +16,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(projects.router)
 
 
 @app.get("/health")
