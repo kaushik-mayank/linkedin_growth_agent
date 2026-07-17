@@ -1,0 +1,86 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: 248 249 251;
+  --surface: 255 255 255;
+  --surface-2: 244 245 248;
+  --border: 226 229 234;
+  --fg: 22 26 34;
+  --muted: 108 116 130;
+  --brand: 37 99 235;
+  --brand-fg: 255 255 255;
+  --positive: 22 143 90;
+  --negative: 208 61 61;
+  --warn: 183 121 12;
+}
+
+.dark {
+  --bg: 12 14 18;
+  --surface: 22 25 31;
+  --surface-2: 30 34 42;
+  --border: 42 47 57;
+  --fg: 232 235 240;
+  --muted: 148 156 170;
+  --brand: 96 143 255;
+  --brand-fg: 12 14 18;
+  --positive: 61 199 130;
+  --negative: 245 110 110;
+  --warn: 226 170 74;
+}
+
+* {
+  border-color: rgb(var(--border));
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+}
+
+body {
+  background: rgb(var(--bg));
+  color: rgb(var(--fg));
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Subtle scrollbars */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--border));
+  border-radius: 6px;
+}
+
+@keyframes shimmer {
+  0% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.55;
+  }
+}
+.animate-pulse-soft {
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-in-up {
+  animation: fadeInUp 0.35s ease both;
+}
