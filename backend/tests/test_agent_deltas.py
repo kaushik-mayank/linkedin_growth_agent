@@ -1,4 +1,4 @@
-from app.agent.deltas import compute_deltas
+from app.agent.deltas import compute_deltas, summarize_trend
 
 
 def test_cold_start_has_no_deltas():
@@ -56,3 +56,43 @@ def test_zero_posts_gives_null_reach_per_post_not_a_crash():
     result = compute_deltas(current, prior)
     assert result["reach_per_post"] is None
     assert result["reach_per_post_prior"] == 100.0
+
+
+def _snap(period_end, followers, imp, eng, rate, posts):
+    return {
+        "period_end": period_end, "followers_total": followers, "followers_new": 0,
+        "impressions": imp, "engagements": eng, "engagement_rate": rate, "posts_published": posts,
+    }
+
+
+def test_summarize_trend_empty_and_single():
+    assert summarize_trend([])["weeks_of_history"] == 0
+    one = summarize_trend([_snap("2026-07-16", 1000, 500, 20, 4.0, 2)])
+    assert one["weeks_of_history"] == 1
+    assert "engagement_rate_decline_streak" not in one  # needs >= 2 weeks
+
+
+def test_summarize_trend_detects_sustained_engagement_decline():
+    snaps = [
+        _snap("2026-06-25", 1000, 5000, 300, 6.0, 1),
+        _snap("2026-07-02", 1010, 4000, 180, 4.5, 2),
+        _snap("2026-07-09", 1020, 3000, 90, 3.0, 4),
+        _snap("2026-07-16", 1030, 2000, 40, 2.0, 6),
+    ]
+    trend = summarize_trend(snaps)
+    assert trend["weeks_of_history"] == 4
+    # engagement rate fell every week: 6 -> 4.5 -> 3 -> 2  => 3 consecutive declines
+    assert trend["engagement_rate_decline_streak"] == 3
+    # reach per post collapsed while volume rose — classic fatigue, caught across the whole line
+    assert trend["reach_per_post_decline_streak"] == 3
+    assert trend["net_follower_change"] == 30
+
+
+def test_summarize_trend_orders_by_period_end_regardless_of_input_order():
+    snaps = [
+        _snap("2026-07-16", 1030, 2000, 40, 2.0, 6),
+        _snap("2026-06-25", 1000, 5000, 300, 6.0, 1),
+    ]
+    trend = summarize_trend(snaps)
+    assert trend["series"][0]["period_end"] == "2026-06-25"
+    assert trend["series"][-1]["period_end"] == "2026-07-16"

@@ -1,15 +1,17 @@
 """CREATIVE DIRECTOR — writes text-to-image PROMPTS only, never generates or hosts images."""
 import json
 
-from app.agent.llm_call import call_llm_for_json
+from app.agent.llm_call import TEMP_BALANCED, call_llm_for_json
 from app.agent.state import WeekState
 
 SYSTEM = (
-    "You are the CREATIVE DIRECTOR. For posts that would benefit from a visual, write a polished "
-    "text-to-image PROMPT ONLY — subject, style, mood, composition, palette — under 60 words. "
-    "Never include text-in-image instructions (image models render text poorly). If a visual would "
-    "add nothing to a post, return the literal string 'text-only' for that post instead of a prompt. "
-    "You never generate, host, or link to an actual image — prompts only. "
+    "You are the CREATIVE DIRECTOR — you decide when a post EARNS a visual and, when it does, brief a "
+    "text-to-image model like a pro. A visual should add meaning or dwell, not decorate. Many strong "
+    "LinkedIn posts are better text-only; say so honestly rather than force an image.\n\n"
+    "When a visual helps, write a PROMPT ONLY — subject, style, mood, composition, palette — under 60 "
+    "words, concrete and specific. Never include any text-in-image instruction (models render text "
+    "poorly; the words live in the caption). If a visual adds nothing, return the exact string "
+    "'text-only' for that post. You never generate, host, or link an actual image — prompts only.\n\n"
     "Return ONLY a single JSON object, no markdown fences, no commentary."
 )
 
@@ -40,7 +42,9 @@ Posts:
 Return JSON matching:
 {EXPECTED_SHAPE}
 """
-    result = await call_llm_for_json(prompt, system=SYSTEM, expected_shape=EXPECTED_SHAPE)
+    result = await call_llm_for_json(
+        prompt, system=SYSTEM, expected_shape=EXPECTED_SHAPE, temperature=TEMP_BALANCED
+    )
     prompts_by_code = {p["post_code"]: p["image_prompt"] for p in result.get("image_prompts", [])}
 
     updated = []

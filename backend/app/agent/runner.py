@@ -2,10 +2,12 @@
 from pathlib import Path
 from typing import Any, Optional
 
+from app.agent.deltas import summarize_trend
 from app.agent.graph import build_graph
 from app.agent.markdown_export import build_markdown, plan_filename
 from app.agent.state import WeekState
 from app.db.supabase_client import get_supabase
+from app.performance_store import load_post_performance
 
 PLANS_DIR = Path(__file__).resolve().parent.parent.parent / "generated_plans"
 
@@ -57,6 +59,26 @@ def _load_prior_snapshot(project_id: str, before_period_end: str) -> Optional[di
     return resp.data[0] if resp.data else None
 
 
+def _load_snapshot_history(project_id: str, up_to_period_end: str) -> list[dict[str, Any]]:
+    """Every snapshot up to and including the one being analyzed, oldest first — the trend line.
+
+    Only the summary columns are needed here (not the heavy `raw` jsonb), keeping the payload small.
+    """
+    resp = (
+        get_supabase()
+        .table("analytics_snapshots")
+        .select(
+            "period_start, period_end, followers_total, followers_new, impressions, "
+            "engagements, engagement_rate, posts_published"
+        )
+        .eq("project_id", project_id)
+        .lte("period_end", up_to_period_end)
+        .order("period_end", desc=False)
+        .execute()
+    )
+    return resp.data or []
+
+
 def _next_week_number(project_id: str) -> int:
     resp = get_supabase().table("weeks").select("id", count="exact").eq("project_id", project_id).execute()
     return (resp.count or 0) + 1
@@ -87,6 +109,9 @@ def _prepare_run(project_id: str, snapshot_id: Optional[str]) -> tuple[dict[str,
         raise AgentRunError("No analytics snapshot found for this project — upload an export first.")
 
     prior_snapshot = _load_prior_snapshot(project_id, current_snapshot["period_end"])
+    snapshot_history = _load_snapshot_history(project_id, current_snapshot["period_end"])
+    trend = summarize_trend(snapshot_history)
+    post_performance = load_post_performance(project_id)
     last_week_posts = _load_last_week_posts(project_id)
     week_number = _next_week_number(project_id)
 
@@ -95,6 +120,9 @@ def _prepare_run(project_id: str, snapshot_id: Optional[str]) -> tuple[dict[str,
         "week_number": week_number,
         "current_snapshot": current_snapshot,
         "prior_snapshot": prior_snapshot,
+        "snapshot_history": snapshot_history,
+        "trend": trend,
+        "post_performance": post_performance,
         "last_week_posts": last_week_posts,
         "revision_count": 0,
         "warnings": [],

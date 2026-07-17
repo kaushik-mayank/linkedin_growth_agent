@@ -1,7 +1,13 @@
 from fastapi import APIRouter, File, HTTPException, UploadFile
+from pydantic import BaseModel
 
 from app.db.supabase_client import get_supabase
 from app.parser.linkedin_parser import parse as parse_linkedin_export
+from app.performance_store import (
+    load_post_performance,
+    map_performance_to_post,
+    sync_post_performance,
+)
 
 router = APIRouter(prefix="/projects/{project_id}/analytics", tags=["analytics"])
 
@@ -79,4 +85,40 @@ async def upload_analytics(project_id: str, file: UploadFile = File(...)):
     if not resp.data:
         raise HTTPException(status_code=502, detail="Supabase returned no data after upsert")
 
-    return {"snapshot": resp.data[0], "parsed": parsed}
+    # Capture real post outcomes (the learning loop). Non-fatal: a failure here must not
+    # block saving the snapshot, but we surface it so it isn't silently lost.
+    performance_saved = 0
+    performance_warning = None
+    try:
+        performance_saved = len(sync_post_performance(project_id, parsed.get("top_posts", [])))
+    except Exception as e:
+        performance_warning = f"Saved the snapshot but could not record post performance: {e}"
+
+    return {
+        "snapshot": resp.data[0],
+        "parsed": parsed,
+        "performance_rows_saved": performance_saved,
+        "performance_warning": performance_warning,
+    }
+
+
+@router.get("/performance")
+async def get_performance(project_id: str):
+    """Real post outcomes (impressions/engagements) captured from past exports."""
+    try:
+        return load_post_performance(project_id)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Supabase error loading performance: {e}") from e
+
+
+class MapPerformanceRequest(BaseModel):
+    post_code: str | None = None
+
+
+@router.patch("/performance/{perf_id}")
+async def map_performance(project_id: str, perf_id: str, body: MapPerformanceRequest):
+    """Link a real post URL to one of our drafted posts (or unlink with post_code=null)."""
+    try:
+        return map_performance_to_post(perf_id, body.post_code)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Supabase error mapping performance: {e}") from e

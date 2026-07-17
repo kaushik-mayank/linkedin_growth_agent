@@ -9,7 +9,9 @@ GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions"
 class GroqProvider(LLMProvider):
     name = "groq"
 
-    async def generate(self, prompt: str, system: str | None = None) -> str:
+    async def generate(
+        self, prompt: str, system: str | None = None, temperature: float | None = None
+    ) -> str:
         if not config.GROQ_API_KEY:
             raise LLMError(self.name, "GROQ_API_KEY is empty — add it to backend/.env")
 
@@ -23,10 +25,12 @@ class GroqProvider(LLMProvider):
         if system:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
-        payload = {
+        payload: dict = {
             "model": config.GROQ_MODEL,
             "messages": messages,
         }
+        if temperature is not None:
+            payload["temperature"] = temperature
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:

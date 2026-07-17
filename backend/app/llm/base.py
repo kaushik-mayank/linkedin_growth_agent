@@ -14,5 +14,7 @@ class LLMProvider(ABC):
     name: str
 
     @abstractmethod
-    async def generate(self, prompt: str, system: str | None = None) -> str:
+    async def generate(
+        self, prompt: str, system: str | None = None, temperature: float | None = None
+    ) -> str:
         ...

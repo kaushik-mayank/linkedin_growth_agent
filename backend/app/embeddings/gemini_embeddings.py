@@ -13,6 +13,9 @@ from app import config
 
 EMBED_URL_TMPL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:embedContent?key={key}"
 
+TASK_DOCUMENT = "RETRIEVAL_DOCUMENT"  # use when storing
+TASK_QUERY = "RETRIEVAL_QUERY"        # use when searching
+
 
 class EmbeddingError(Exception):
     def __init__(self, message: str):
@@ -27,7 +30,14 @@ def normalize(vector: list[float]) -> list[float]:
     return [x / norm for x in vector]
 
 
-async def embed_text(text: str) -> list[float]:
+async def embed_text(text: str, task_type: str | None = None) -> list[float]:
+    """Embed one string.
+
+    task_type asymmetry matters for retrieval quality with gemini-embedding-001:
+    pass "RETRIEVAL_DOCUMENT" when STORING a memory and "RETRIEVAL_QUERY" when
+    SEARCHING. The model places queries and documents in complementary regions of
+    the space, so matching the task type on each side sharpens similarity.
+    """
     if not config.GEMINI_API_KEY:
         raise EmbeddingError("GEMINI_API_KEY is empty — add it to backend/.env")
 
@@ -38,6 +48,8 @@ async def embed_text(text: str) -> list[float]:
         "content": {"parts": [{"text": text}]},
         "outputDimensionality": config.EMBEDDING_DIMENSIONS,
     }
+    if task_type:
+        payload["taskType"] = task_type
 
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:

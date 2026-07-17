@@ -7,6 +7,9 @@ class WeekState(TypedDict, total=False):
     week_number: int
     current_snapshot: dict[str, Any]
     prior_snapshot: Optional[dict[str, Any]]
+    snapshot_history: list[dict[str, Any]]
+    trend: dict[str, Any]
+    post_performance: list[dict[str, Any]]
     is_cold_start: bool
     deltas: dict[str, Any]
 

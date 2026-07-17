@@ -1,7 +1,9 @@
-"""Pure arithmetic deltas between this week's snapshot and the prior one.
+"""Pure arithmetic deltas and multi-week trends.
 
 Kept out of the LLM's hands so the math is always correct — the Analyst node
-only reasons about what these numbers MEAN, never computes them itself.
+only reasons about what these numbers MEAN, never computes them itself. A real
+analyst reads the whole trend line, not just this week vs. last week, so we also
+summarize the full snapshot history deterministically.
 """
 from typing import Any, Optional
 
@@ -49,3 +51,56 @@ def compute_deltas(current: dict[str, Any], prior: Optional[dict[str, Any]]) -> 
         else None
     )
     return result
+
+
+def _reach_per_post(s: dict[str, Any]) -> Optional[float]:
+    posts = s.get("posts_published") or 0
+    return round((s.get("impressions") or 0) / posts, 2) if posts else None
+
+
+def _consecutive_decline(series: list[Optional[float]]) -> int:
+    """How many periods in a row (ending now) the metric fell. Ignores None gaps."""
+    vals = [v for v in series if v is not None]
+    streak = 0
+    for i in range(len(vals) - 1, 0, -1):
+        if vals[i] < vals[i - 1]:
+            streak += 1
+        else:
+            break
+    return streak
+
+
+def summarize_trend(snapshots: list[dict[str, Any]]) -> dict[str, Any]:
+    """Compact, deterministic summary of the whole snapshot history (oldest -> newest).
+
+    Gives the Analyst real memory of the trend line: the per-week series plus derived
+    signals (consecutive weeks of decline, net follower change across the window) so it
+    can distinguish a one-week blip from a sustained slide.
+    """
+    ordered = sorted(snapshots, key=lambda s: s.get("period_end") or "")
+    series = [
+        {
+            "period_end": s.get("period_end"),
+            "followers_total": s.get("followers_total"),
+            "followers_new": s.get("followers_new"),
+            "impressions": s.get("impressions"),
+            "engagements": s.get("engagements"),
+            "engagement_rate": s.get("engagement_rate"),
+            "posts_published": s.get("posts_published"),
+            "reach_per_post": _reach_per_post(s),
+        }
+        for s in ordered
+    ]
+
+    out: dict[str, Any] = {"weeks_of_history": len(series), "series": series}
+    if len(series) >= 2:
+        first, last = series[0], series[-1]
+        out["net_follower_change"] = (last["followers_total"] or 0) - (first["followers_total"] or 0)
+        out["engagement_rate_decline_streak"] = _consecutive_decline(
+            [s["engagement_rate"] for s in series]
+        )
+        out["reach_per_post_decline_streak"] = _consecutive_decline(
+            [s["reach_per_post"] for s in series]
+        )
+        out["impressions_decline_streak"] = _consecutive_decline([s["impressions"] for s in series])
+    return out

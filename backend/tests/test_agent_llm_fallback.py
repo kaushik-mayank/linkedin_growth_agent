@@ -10,7 +10,7 @@ class _FakeProvider:
         self._reply = reply
         self._error = error
 
-    async def generate(self, prompt, system=None):
+    async def generate(self, prompt, system=None, temperature=None):
         if self._error:
             raise LLMError(self.name, self._error)
         return self._reply
