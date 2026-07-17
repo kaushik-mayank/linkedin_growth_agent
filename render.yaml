@@ -1,0 +1,49 @@
+# Render blueprint for the backend API. In Render: New + > Blueprint, point it at this repo.
+# Render reads this file, creates the service, and PROMPTS you to paste each secret
+# (the ones marked `sync: false`) into its dashboard — secrets never live in this file or git.
+services:
+  - type: web
+    name: linkedin-growth-agent-api
+    runtime: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      # Pin the Python version Render builds with.
+      - key: PYTHON_VERSION
+        value: "3.13.4"
+
+      # Non-secret defaults (safe to keep in the repo; change models here in seconds).
+      - key: LLM_PROVIDER
+        value: groq
+      - key: GROQ_MODEL
+        value: llama-3.3-70b-versatile
+      - key: GEMINI_MODEL
+        value: gemini-flash-lite-latest
+      - key: EMBEDDING_MODEL
+        value: gemini-embedding-001
+      - key: EMBEDDING_DIMENSIONS
+        value: "768"
+      - key: TAVILY_CACHE_TTL_HOURS
+        value: "168"
+      - key: LANGCHAIN_TRACING_V2
+        value: "false"
+
+      # Secrets — Render will ask you to enter these; they are NEVER stored in git.
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+
+      # Set this to your deployed frontend origin(s) once Vercel gives you the URL,
+      # e.g. https://your-app.vercel.app  (comma-separated for more than one).
+      - key: ALLOWED_ORIGINS
+        sync: false
