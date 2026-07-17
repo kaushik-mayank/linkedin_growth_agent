@@ -25,6 +25,17 @@ app.include_router(agent.router)
 app.include_router(weeks.router)
 
 
+@app.get("/")
+async def root():
+    """Friendly landing so hitting the base URL confirms the API is alive (instead of a bare 404)."""
+    return {
+        "service": "LinkedIn Growth Agent — API",
+        "status": "ok",
+        "docs": "/docs",
+        "health": "/health",
+    }
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
