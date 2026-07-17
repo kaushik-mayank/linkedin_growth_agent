@@ -79,7 +79,7 @@ def _load_last_week_posts(project_id: str) -> list[dict[str, Any]]:
     return posts_resp.data or []
 
 
-async def run_weekly_agent(project_id: str, snapshot_id: Optional[str] = None) -> dict[str, Any]:
+def _prepare_run(project_id: str, snapshot_id: Optional[str]) -> tuple[dict[str, Any], int, WeekState]:
     project = _load_project(project_id)
 
     current_snapshot = _load_snapshot(snapshot_id) if snapshot_id else _load_latest_snapshot(project_id)
@@ -99,11 +99,14 @@ async def run_weekly_agent(project_id: str, snapshot_id: Optional[str] = None) -
         "revision_count": 0,
         "warnings": [],
     }
+    return project, week_number, initial_state
 
-    graph = build_graph()
-    final_state = await graph.ainvoke(initial_state, config={"recursion_limit": 50})
 
-    week_row = _persist_week(project_id, week_number, current_snapshot["id"], final_state)
+def _finalize_run(
+    project_id: str, project: dict[str, Any], week_number: int, final_state: dict[str, Any]
+) -> dict[str, Any]:
+    snapshot_id = final_state["current_snapshot"]["id"]
+    week_row = _persist_week(project_id, week_number, snapshot_id, final_state)
     post_rows = _persist_posts(project_id, week_row["id"], final_state.get("posts", []))
     _update_project_strategy(project_id, final_state.get("strategy", {}))
 
@@ -119,6 +122,55 @@ async def run_weekly_agent(project_id: str, snapshot_id: Optional[str] = None) -
         "is_recovery_week": final_state.get("is_recovery_week", False),
         "warnings": final_state.get("warnings", []),
     }
+
+
+async def run_weekly_agent(project_id: str, snapshot_id: Optional[str] = None) -> dict[str, Any]:
+    project, week_number, initial_state = _prepare_run(project_id, snapshot_id)
+
+    graph = build_graph()
+    final_state = await graph.ainvoke(initial_state, config={"recursion_limit": 50})
+
+    return _finalize_run(project_id, project, week_number, final_state)
+
+
+# Human-friendly labels streamed to the UI so it can show which specialist is working.
+NODE_LABELS = {
+    "analyst": "Analyst reading your export…",
+    "profiler": "Audience Profiler studying who actually follows you…",
+    "researcher": "Researcher scanning this week's news…",
+    "historian": "Historian recalling past learnings…",
+    "strategist": "Strategist deciding this week's plan…",
+    "copywriter": "Copywriter drafting your posts…",
+    "creative_director": "Creative Director designing image prompts…",
+    "critic": "Critic scoring and refining drafts…",
+    "librarian": "Librarian saving what it learned…",
+}
+
+
+async def stream_weekly_agent(project_id: str, snapshot_id: Optional[str] = None):
+    """Async generator yielding progress dicts as each node finishes, then a final 'done' event.
+
+    Uses LangGraph's astream in 'updates' mode; each chunk is {node_name: partial_state}. Since
+    every node returns only the keys it changed (no reducers), merging updates last-write-wins
+    reconstructs the same final state ainvoke would produce.
+    """
+    project, week_number, initial_state = _prepare_run(project_id, snapshot_id)
+
+    graph = build_graph()
+    accumulated: dict[str, Any] = dict(initial_state)
+
+    async for chunk in graph.astream(initial_state, config={"recursion_limit": 50}, stream_mode="updates"):
+        for node_name, update in chunk.items():
+            if isinstance(update, dict):
+                accumulated.update(update)
+            yield {
+                "type": "progress",
+                "node": node_name,
+                "label": NODE_LABELS.get(node_name, node_name),
+            }
+
+    result = _finalize_run(project_id, project, week_number, accumulated)
+    yield {"type": "done", "result": result}
 
 
 def _persist_week(

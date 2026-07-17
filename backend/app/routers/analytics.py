@@ -6,6 +6,23 @@ from app.parser.linkedin_parser import parse as parse_linkedin_export
 router = APIRouter(prefix="/projects/{project_id}/analytics", tags=["analytics"])
 
 
+@router.get("/snapshots")
+async def list_snapshots(project_id: str):
+    """All snapshots for a project, oldest first — powers header stats, deltas, and sparklines."""
+    try:
+        resp = (
+            get_supabase()
+            .table("analytics_snapshots")
+            .select("*")
+            .eq("project_id", project_id)
+            .order("period_end", desc=False)
+            .execute()
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Supabase error listing snapshots: {e}") from e
+    return resp.data
+
+
 @router.post("/preview")
 async def preview_analytics(project_id: str, file: UploadFile = File(...)):
     """Parse only — nothing is written to the database. Used for the upload confirmation screen."""

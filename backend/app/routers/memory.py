@@ -1,11 +1,29 @@
 from fastapi import APIRouter, HTTPException
 
+from app.db.supabase_client import get_supabase
 from app.embeddings.gemini_embeddings import EmbeddingError
 from app.memory_store import search_memory as search_memory_rows
 from app.memory_store import store_memory
 from app.models.memory import MemoryCreate, MemoryMatch, MemoryOut, MemorySearchRequest
 
 router = APIRouter(prefix="/projects/{project_id}/memory", tags=["memory"])
+
+
+@router.get("", response_model=list[MemoryOut])
+async def list_memory(project_id: str):
+    """All learnings for a project, newest first — powers the 'what the agent has learned' view."""
+    try:
+        resp = (
+            get_supabase()
+            .table("memory")
+            .select("id, project_id, kind, content, metadata, created_at")
+            .eq("project_id", project_id)
+            .order("created_at", desc=True)
+            .execute()
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Supabase error listing memory: {e}") from e
+    return resp.data
 
 
 @router.post("", response_model=MemoryOut)
